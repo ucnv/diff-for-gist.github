@@ -20,62 +20,51 @@
         $('#diffExec').attr('disabled', (c.length != 2));
     };
     var diffExec = function() {
-        if(!$('#diff-view').length) {
+        if(!$('#diffView').length) {
             $('#files').prepend(
-            <div class="file" id="diff-view">
+            <div class="file" id="diffView">
               <div class="data syntax">
-                  <table cellspacing="0" cellpadding="0">
-                    <tr>
-                      <td width="100%">
-                        <div class="highlight">
-                          <pre>compareing...</pre>
-                        </div>
-                      </td>
-                    </tr>
+                <table cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td width="100%">
+                      <div class="highlight"><pre></pre></div>
+                    </td>
+                  </tr>
                 </table>
               </div>
-            </div>.toXMLString());
+            </div>.toXMLString()
+            );
         }
-        $('#diff-view').hide();
+        $('#diffView').hide();
         var selected = $('#revisions').find('input:checkbox:checked');
-        var link = selected.map(function() { return this.value.replace(/(https?:\/\/gist\.github\.com\/)/, '$1raw/') });
+        var link = selected.map(function() { return this.value.replace(/(https?:\/\/[^/]+\/)/, '$1raw/') });
         var desc = selected.map(function() { return $(this).parent().text().replace(/\s+/g, ' '); });
         with(D()) {
-        parallel([
-            xhttp.get(link[0])
+        var fetch = function(url) {
+            return xhttp.get(url)
             .next(function(res) {
                 var r = res.responseText.split(/\n/)[0].split(/\s/)[1];
-                var url = link[0].replace(/[^\/]*$/, r);
-                return xhttp.get(url);
+                return xhttp.get(url.replace(/[^\/]*$/, r));
             })
             .next(function(res) {
                 var r = res.responseText.split(/\n/)[0].split(/\s/)[2];
-                var url = link[0].replace(/[^\/]*$/, r);
-                return xhttp.get(url);
-            })
-            ,
-            xhttp.get(link[1])
-            .next(function(res) {
-                var r = res.responseText.split(/\n/)[0].split(/\s/)[1];
-                var url = link[1].replace(/[^\/]*$/, r);
-                return xhttp.get(url);
-            })
-            .next(function(res) {
-                var r = res.responseText.split(/\n/)[0].split(/\s/)[2];
-                var url = link[1].replace(/[^\/]*$/, r);
-                return xhttp.get(url);
-            })
-        ]).next(function (res) {
+                return xhttp.get(url.replace(/[^\/]*$/, r));
+            });
+        };
+        parallel(
+            [fetch(link[0]), fetch(link[1])]
+        ).next(function (res) {
+            var pre = $('#diffView pre');
             var udiff = new UnifiedDiff(res[1].responseText, res[0].responseText, 3).toString();
-            udiff = '--- ' + desc[1] + '\n' + '+++ ' + desc[0] + '\n' + udiff;
+            udiff = '--- ' + desc[1] + '\n' + '+++ ' + desc[0] + '\n' + pre.text(udiff).html();
             if(udiff.split(/\n/).length < 5000) {
-                udiff = udiff.replace(/^(\+.*)$/mg, '<span class="gd">$1</span>');
-                udiff = udiff.replace(/^(\-.*)$/mg, '<span class="gi">$1</span>');
-                udiff = udiff.replace(/^(\@.*)$/mg, '<span class="gu">$1</span>');
-                udiff = udiff.replace(/^(.*)\n/mg, '<div class="line">$1</div>');
+                udiff = udiff.replace(/^(\+.*)$/mg, '<span class="gd">$1</span>')
+                             .replace(/^(\-.*)$/mg, '<span class="gi">$1</span>')
+                             .replace(/^(\@.*)$/mg, '<span class="gu">$1</span>')
+                             .replace(/^(.*)\n/mg, '<div class="line">$1</div>');
             }
-            $('#diff-view pre').empty().append(udiff)
-            $('#diff-view').slideDown('normal');
+            pre.html(udiff);
+            $('#diffView').slideDown('normal');
         });
         }
     };

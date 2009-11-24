@@ -1,0 +1,1 @@
+This script is also available at <http://userscripts.org/scripts/show/62706>.

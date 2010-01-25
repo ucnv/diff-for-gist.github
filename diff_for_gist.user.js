@@ -76,9 +76,9 @@
         diff.a.shift(), diff.b.shift(), diff.lcs.shift();
         var messages = diff.lcs.map(function(n) {
           if(n > 0) {
-            return '<p class="gd" style="padding:2px;">' + diff.b.shift() + ' added</p>';
+            return '<p class="gi" style="padding:2px;">' + diff.b.shift() + ' added</p>';
           } else if(n < 0) {
-            return '<p class="gi" style="padding:2px;">' + diff.a.shift() + ' removed</p>';
+            return '<p class="gd" style="padding:2px;">' + diff.a.shift() + ' removed</p>';
           } else {
             diff.a.shift(), diff.b.shift();
             return '';
@@ -97,10 +97,10 @@
           var udiff = new UnifiedDiff(contentB, contentA, includeLines).toString();
           udiff = '--- ' + nameB + '\n' + '+++ ' + nameA + '\n' + this.pre.text(udiff).html();
           if(udiff.split(/\n/).length < 5000) { // ignore if the diff is too big.
-            udiff = udiff.replace(/^(\+.*)$/mg, '<span class="gd">$1</span>')
-                         .replace(/^(\-.*)$/mg, '<span class="gi">$1</span>')
-                         .replace(/^(\@.*)$/mg, '<span class="gu">$1</span>')
-                         .replace(/^(.*)\n/mg, '<div class="line">$1</div>');
+            udiff = udiff.replace(/^(.*)\n/mg, '<div class="line">$1</div>')
+                         .replace(/">\+/mg, ' gi">+')
+                         .replace(/">\-/mg, ' gd">-')
+                         .replace(/">\@/mg, ' gu">@');
           }
           return '<div class="file"><div class="data syntax"><div class="highlight"><pre>'
                + udiff 

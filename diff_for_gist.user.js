@@ -49,10 +49,10 @@
     with(D()) {
     parallel(
       Array.map.call(this, link, function(url) {  // link is a jQuery object.
-        return xhttp.get(url)
+        return xhttp.get(url + '/meta')
         .next(function(res) {
           var r = res.responseText.split(/\n/)[0].split(/\s/)[1];
-          return xhttp.get(urlbase + r);
+          return xhttp.get(urlbase + r + '/meta');
         });
       })
     ).next(function (res) {
@@ -89,7 +89,7 @@
       
       parallel(
         diffQueue.map(function(e) {
-          return xhttp.get(urlbase + e.hash);
+          return xhttp.get(urlbase + e.hash + '/' + e.name);
         })
       ).next(function(res) {
         var format = function(contentB, contentA, includeLines, nameB, nameA) {

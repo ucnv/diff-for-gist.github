@@ -2,17 +2,14 @@
 // @name           Diff for gist.github
 // @description    adds a diff function to http://gist.github.com/
 // @namespace      http://userscripts.org/users/40991
-// @include        http://gist.github.com/*
 // @include        https://gist.github.com/*
-// @require        https://raw.github.com/cho45/jsdeferred/master/jsdeferred.userscript.js
 // @require        https://raw.github.com/gist/105908/diff.js
 // ==/UserScript==
 
 (function() {
   var $ = unsafeWindow.jQuery;
   var rev = $('#revisions li');
-  if(!rev.length || rev.length == 1) return;
-  
+  if(+rev.length <= 1) return;
   rev.each(function() {
     var r = $(this);
     r.prepend(
@@ -24,13 +21,13 @@
   });
   $('#revisions').append(
     $('<input type="button" />')
-    .attr('name', 'diffExec')
     .attr('id', 'diffExec')
+    .attr('name', 'diffExec')
     .val('Compare')
     .bind('click', diffExec)
     .attr('disabled', 'disabled')
   );
-
+  
   function diffSelect(e) {
     var me = e.target;
     var c = $('#revisions li input:checked');
@@ -43,82 +40,65 @@
     var diffView = $('#diffView');
     diffView.hide();
     var selected = $('#revisions').find('input:checkbox:checked');
-    var link = selected.map(function() { return this.value.replace(/(https?:\/\/[^/]+\/)/, '$1raw/') });
-    var desc = selected.map(function() { return $(this).parent().text().replace(/\s+/g, ' '); });
-    var urlbase = link[0].slice(0, link[0].lastIndexOf('/') + 1)
-    with(D()) {
-    parallel(
-      Array.map.call(this, link, function(url) {  // link is a jQuery object.
-        return xhttp.get(url + '/meta')
-        .next(function(res) {
-          var r = res.responseText.split(/\n/)[0].split(/\s/)[1];
-          return xhttp.get(urlbase + r + '/meta');
-        });
-      })
-    ).next(function (res) {
-      var data = res.map(function(r) {
-        return r.responseText.split(/\n/).map(function(e) {
-          var v = e.split(' ')[2].split("\t");
-          return { hash: v[0], name: v[1] || '' };
-        });
-      });
-      var diffQueue = [], diffHtml = [];
-      var listChanged = (data[0].length != data[1].length);
-      data[0].forEach(function(d0) {
-        data[1].forEach(function(d1) {
-          listChanged = listChanged || (d0.hash == d1.hash && d0.name != d1.name);
-          if(d0.hash != d1.hash && d0.name == d1.name) diffQueue.push(d0, d1);
-        });
+    var link = selected.map(function(){ return this.value.replace(/^[^\d]+\//, 'https://api.github.com/gists/'); });
+    var desc = selected.map(function(){ return $(this).parent().text().replace(/\s+/g, ' '); });
+    var xhr = function(url) {
+      return $.Deferred(function(d) {
+        setTimeout(function() {
+          GM_xmlhttpRequest({ method: 'GET', url: url, onload: d.resolve });
+        },0);
+      }).promise();
+    };
+    
+    $.when(xhr(link[0]), xhr(link[1])).then(function(res1, res2) {
+      var wrapHtml = function(s) {
+        return '<div class="file"><div class="data syntax"><div class="highlight"><pre>' 
+              + s + '</pre></div></div></div>'
+      };
+      var diffHtml = [], diffQueue = [];
+      var files1 = JSON.parse(res1.responseText).files, 
+          files2 = JSON.parse(res2.responseText).files;
+      var listChanged = (files1.length != files2.length);
+      $.each(files1, function(k) {
+        if(!files2[k]) listChanged = true;
+        else if(files2[k] && files1[k].raw_url != files2[k].raw_url) diffQueue.push(k);
       });
       if(listChanged) {
-        var d = data.map(function(e) { return e.map(function(o) { return o.name }) });
-        var diff = new Diff(d[1], d[0]);
+        var d1 = [], d2 = [];
+        $.each(files1, function(n){ d1.push(n) });
+        $.each(files2, function(n){ d2.push(n) });
+        var diff = new Diff(d1, d2);
         diff.a.shift(), diff.b.shift(), diff.lcs.shift();
         var messages = diff.lcs.map(function(n) {
-          if(n > 0) {
-            return '<p class="gi" style="padding:2px;">' + diff.b.shift() + ' added</p>';
-          } else if(n < 0) {
-            return '<p class="gd" style="padding:2px;">' + diff.a.shift() + ' removed</p>';
-          } else {
-            diff.a.shift(), diff.b.shift();
-            return '';
-          }
+          var line = '';
+          if(n > 0)      line = '<div class="gi" style="padding:2px;">' + diff.b.shift() + ' added</div>';
+          else if(n < 0) line = '<div class="gd" style="padding:2px;">' + diff.a.shift() + ' removed</div>';
+          else diff.a.shift(), diff.b.shift();
+          return line;
         });
-        diffHtml.push('<div class="file"><div class="data syntax">' + messages.join('') + '</div></div>');
+        diffHtml.push(wrapHtml(messages.join('')));
       }
-      
-      parallel(
-        diffQueue.map(function(e) {
-          return xhttp.get(urlbase + e.hash + '/' + e.name);
-        })
-      ).next(function(res) {
-        var format = function(contentB, contentA, includeLines, nameB, nameA) {
-          this.pre = this.pre || $('<pre></pre>');
-          var udiff = new UnifiedDiff(contentB, contentA, includeLines).toString();
-          udiff = '--- ' + nameB + '\n' + '+++ ' + nameA + '\n' + this.pre.text(udiff).html();
-          if(udiff.split(/\n/).length < 5000) { // ignore if the diff is too big.
-            udiff = udiff.replace(/^(.*)\n/mg, '<div class="line">$1</div>')
-                         .replace(/">\+/mg, ' gi">+')
-                         .replace(/">\-/mg, ' gd">-')
-                         .replace(/">\@/mg, ' gu">@');
-          }
-          return '<div class="file"><div class="data syntax"><div class="highlight"><pre>'
-               + udiff 
-               + '</pre></div></div></div>';
-        };
-        
-        diffQueue.forEach(function(e, i, a) {
-          if(i % 2 == 0) return;
-          var contentA = res[i - 1].responseText;
-          var contentB = res[i].responseText;
-          var nameA = desc[0] + ' ' + diffQueue[i - 1].name;
-          var nameB = desc[1] + ' ' + e.name;
-          diffHtml.push(format(contentB, contentA, 3, nameB, nameA));
-        });
-        
-        diffView.html(diffHtml.join('') || '<div>No difference.</div>').slideDown('normal');
+      var format = function(contentB, contentA, includeLines, nameB, nameA) {
+        this.pre = this.pre || $('<pre></pre>');
+        var udiff = new UnifiedDiff(contentB, contentA, includeLines).toString();
+        udiff = '--- ' + nameB + '\n' + '+++ ' + nameA + '\n' + this.pre.text(udiff).html();
+        if(udiff.split(/\n/).length < 5000) { // ignore if the diff is too big.
+          udiff = udiff.replace(/^(.*)\n/mg, '<div class="line">$1</div>')
+                       .replace(/">\+/mg, ' gi">+')
+                       .replace(/">\-/mg, ' gd">-')
+                       .replace(/">\@/mg, ' gu">@');
+        }
+        return wrapHtml(udiff);
+      };
+      $.each(diffQueue, function(k) {
+        var name = diffQueue[k];
+        var nameA = desc[0] + ' ' + name, nameB = desc[1] + ' ' + name;
+        var contentA = files1[name].content, contentB = files2[name].content;
+        unsafeWindow.console.log(contentA)
+        diffHtml.push(format(contentB, contentA, 3, nameB, nameA));
       });
-    }).error(console.log)
-    }
+      var html = diffHtml.join('') || wrapHtml('<p style="padding:2px 10px;">No difference.</p>');
+      diffView.html(html).slideDown('normal');
+    });
   }
 })()

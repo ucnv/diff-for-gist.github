@@ -4,8 +4,8 @@
 // @namespace      http://userscripts.org/users/40991
 // @include        http://gist.github.com/*
 // @include        https://gist.github.com/*
-// @require        https://github.com/cho45/jsdeferred/raw/master/jsdeferred.userscript.js
-// @require        https://gist.github.com/105908.txt
+// @require        https://raw.github.com/cho45/jsdeferred/master/jsdeferred.userscript.js
+// @require        https://raw.github.com/gist/105908/diff.js
 // ==/UserScript==
 
 (function() {

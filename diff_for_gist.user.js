@@ -94,7 +94,6 @@
         var name = diffQueue[k];
         var nameA = desc[0] + ' ' + name, nameB = desc[1] + ' ' + name;
         var contentA = files1[name].content, contentB = files2[name].content;
-        unsafeWindow.console.log(contentA)
         diffHtml.push(format(contentB, contentA, 3, nameB, nameA));
       });
       var html = diffHtml.join('') || wrapHtml('<p style="padding:2px 10px;">No difference.</p>');
